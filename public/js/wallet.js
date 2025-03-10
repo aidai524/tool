@@ -500,17 +500,76 @@ class WalletManager {
     this.refreshAllBtn.textContent = 'Refreshing...';
     
     const refreshButtons = document.querySelectorAll('.refresh-balance-btn');
+    const totalWallets = refreshButtons.length;
+    let successCount = 0;
+    let errorCount = 0;
     
     try {
+      // Determine if we're in production (Vercel) or local environment
+      const isProduction = window.location.hostname !== 'localhost' && !window.location.hostname.includes('127.0.0.1');
+      
+      // Use longer delay in production to avoid rate limiting
+      const delayBetweenRequests = isProduction ? 1000 : 300; // 1 second in production, 300ms locally
+      
       for (let i = 0; i < refreshButtons.length; i++) {
         const button = refreshButtons[i];
         const index = parseInt(button.getAttribute('data-index'));
+        const wallet = this.wallets[index];
+        const balanceCell = button.parentElement.previousElementSibling;
         
-        // Add a small delay between requests to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        await this.refreshWalletBalance(index);
+        try {
+          // Add a delay between requests to avoid rate limiting
+          if (i > 0) {
+            await new Promise(resolve => setTimeout(resolve, delayBetweenRequests));
+          }
+          
+          // Update progress in refresh button
+          this.refreshAllBtn.textContent = `Refreshing ${i+1}/${totalWallets}...`;
+          
+          // Instead of calling refreshWalletBalance which has its own UI updates,
+          // we'll implement the core functionality here to avoid UI conflicts
+          
+          // Show loading indicator
+          balanceCell.textContent = 'Loading...';
+          
+          // Determine API URL based on environment
+          const apiUrl = isProduction
+            ? `${window.location.origin}/api/wallet-balance/${wallet.publicKey}`
+            : `/api/wallet-balance/${wallet.publicKey}`;
+          
+          // Call API to get updated balance
+          const response = await fetch(apiUrl);
+          const data = await response.json();
+          
+          if (data.error) {
+            throw new Error(data.error);
+          }
+          
+          // Update wallet balance
+          wallet.balance = data.balance;
+          
+          // Update display
+          balanceCell.textContent = `${wallet.balance.toFixed(6)} SOL`;
+          successCount++;
+          
+        } catch (error) {
+          console.error(`Error refreshing wallet ${index}:`, error);
+          balanceCell.textContent = 'Error';
+          errorCount++;
+          
+          // Continue with next wallet despite errors
+          continue;
+        }
       }
+      
+      // Save updated wallets to storage after all are processed
+      this.saveWalletsToStorage();
+      
+      // Show summary
+      if (errorCount > 0) {
+        alert(`Refresh complete: ${successCount} succeeded, ${errorCount} failed`);
+      }
+      
     } finally {
       // Re-enable refresh all button
       this.refreshAllBtn.disabled = false;

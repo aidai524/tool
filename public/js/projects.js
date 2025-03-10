@@ -7,6 +7,8 @@ class ProjectManager {
     this.projectsContainer = document.getElementById('projectsContainer');
     this.projectsList = document.getElementById('projectsList');
     this.loadProjectsBtn = document.getElementById('loadProjectsBtn');
+    this.loadMoreProjectsBtn = document.getElementById('loadMoreProjectsBtn');
+    this.loadMoreContainer = document.getElementById('loadMoreContainer');
     this.projectsLoading = document.getElementById('projectsLoading');
     
     // Pagination state
@@ -26,25 +28,68 @@ class ProjectManager {
     // Load projects
     this.loadProjectsBtn.addEventListener('click', () => this.loadProjects());
     
-    // Add scroll event listener for infinite scroll
-    window.addEventListener('scroll', this.handleScroll.bind(this));
+    // Load more projects
+    this.loadMoreProjectsBtn.addEventListener('click', () => this.loadMoreProjects());
+    
+    // Create and add back to top button
+    this.createBackToTopButton();
   }
   
   /**
-   * Handle scroll event for infinite loading
+   * Create a back to top button and add it to the page
    */
-  handleScroll() {
-    if (this.isLoading || !this.hasMoreProjects) return;
+  createBackToTopButton() {
+    // Create button element
+    const backToTopBtn = document.createElement('button');
+    backToTopBtn.id = 'backToTopBtn';
+    backToTopBtn.innerHTML = '🚀';
+    backToTopBtn.title = 'Back to Top';
     
-    // Check if user has scrolled to the bottom
-    const scrollY = window.scrollY;
-    const visibleHeight = window.innerHeight;
-    const pageHeight = document.documentElement.scrollHeight;
-    const bottomOfPage = visibleHeight + scrollY >= pageHeight - 200;
+    // Add styles
+    backToTopBtn.style.position = 'fixed';
+    backToTopBtn.style.bottom = '20px';
+    backToTopBtn.style.right = '20px';
+    backToTopBtn.style.zIndex = '99';
+    backToTopBtn.style.fontSize = '24px';
+    backToTopBtn.style.width = '50px';
+    backToTopBtn.style.height = '50px';
+    backToTopBtn.style.borderRadius = '50%';
+    backToTopBtn.style.backgroundColor = '#4CAF50';
+    backToTopBtn.style.color = 'white';
+    backToTopBtn.style.border = 'none';
+    backToTopBtn.style.cursor = 'pointer';
+    backToTopBtn.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
+    backToTopBtn.style.display = 'none'; // Hidden by default
     
-    if (bottomOfPage) {
-      this.loadMoreProjects();
-    }
+    // Add hover effect
+    backToTopBtn.onmouseover = function() {
+      this.style.backgroundColor = '#45a049';
+      this.style.transform = 'scale(1.1)';
+    };
+    backToTopBtn.onmouseout = function() {
+      this.style.backgroundColor = '#4CAF50';
+      this.style.transform = 'scale(1)';
+    };
+    
+    // Add click event listener
+    backToTopBtn.addEventListener('click', () => {
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+    });
+    
+    // Show button when user scrolls down 300px from the top
+    window.addEventListener('scroll', () => {
+      if (document.body.scrollTop > 300 || document.documentElement.scrollTop > 300) {
+        backToTopBtn.style.display = 'block';
+      } else {
+        backToTopBtn.style.display = 'none';
+      }
+    });
+    
+    // Add button to the body
+    document.body.appendChild(backToTopBtn);
   }
   
   /**
@@ -54,12 +99,19 @@ class ProjectManager {
     this.projectsLoading.style.display = 'block';
     this.loadProjectsBtn.disabled = true;
     this.projectsList.innerHTML = '';
+    this.loadMoreContainer.style.display = 'none';
     
     // Reset pagination state
     this.currentPage = 1;
     this.isLoading = true;
     this.hasMoreProjects = true;
     this.allProjects = [];
+    
+    // Scroll to top when loading new projects
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
     
     try {
       const response = await fetch(`/api/projects/list?page=${this.currentPage}`, {
@@ -82,6 +134,9 @@ class ProjectManager {
       
       // Display projects
       this.displayProjects(this.allProjects, true);
+      
+      // Show/hide load more button based on pagination
+      this.loadMoreContainer.style.display = this.hasMoreProjects ? 'block' : 'none';
     } catch (error) {
       console.error('Error loading projects:', error);
       this.projectsList.innerHTML = `<div class="error-message">Error loading projects: ${error.message}</div>`;
@@ -93,10 +148,12 @@ class ProjectManager {
   }
   
   /**
-   * Load more projects for infinite scroll
+   * Load more projects when Load More button is clicked
    */
   async loadMoreProjects() {
     if (this.isLoading || !this.hasMoreProjects) return;
+    
+    this.loadMoreProjectsBtn.disabled = true;
     
     this.isLoading = true;
     this.projectsLoading.style.display = 'block';
@@ -127,12 +184,16 @@ class ProjectManager {
       if (newProjects.length > 0) {
         this.displayProjects(newProjects, false);
       }
+      
+      // Update load more button visibility
+      this.loadMoreContainer.style.display = this.hasMoreProjects ? 'block' : 'none';
     } catch (error) {
       console.error('Error loading more projects:', error);
       // Don't clear the existing projects on error
     } finally {
       this.projectsLoading.style.display = 'none';
       this.isLoading = false;
+      this.loadMoreProjectsBtn.disabled = false;
     }
   }
   

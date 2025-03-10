@@ -35,7 +35,7 @@
       ],
       "status": 401
     },
-    { "src": "/api/(.*)", "dest": "/server.js" },
+    { "src": "/api/wallet-balance/(.*)", "dest": "/api/wallet-balance.js" },
     { "src": "/api/generate-wallets", "dest": "/api/generate-wallets.js" },
     { "src": "/api/validate-wallets", "dest": "/api/validate-wallets.js" },
     { "src": "/api/import-wallets", "dest": "/api/import-wallets.js" },
@@ -43,6 +43,7 @@
     { "src": "/api/buy-tokens", "dest": "/api/buy-tokens.js" },
     { "src": "/api/projects/list", "dest": "/api/projects/list.js" },
     { "src": "/api/projects", "dest": "/api/projects/index.js" },
+    { "src": "/api/(.*)", "dest": "/server.js" },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/public/$1" },
     { "src": "/(.*)", "dest": "/public/index.html" }

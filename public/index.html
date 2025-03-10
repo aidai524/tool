@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solana Wallet & Like Tool</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Solana Wallet & Like Tool</h1>
+    
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="wallet-tab">Wallet Generator</button>
+      <button class="tab-btn" data-tab="projects-tab">Projects</button>
+      <button class="tab-btn" data-tab="like-tab">Batch Like</button>
+      <button class="tab-btn" data-tab="buy-tab">Batch Buy</button>
+    </div>
+    
+    <div id="wallet-tab" class="tab-content active">
+      <div class="card">
+        <h2>Generate Wallets</h2>
+        <div class="form-group">
+          <label for="walletCount">Number of Wallets:</label>
+          <input type="number" id="walletCount" min="1" max="100" value="5">
+        </div>
+        <button id="generateBtn" class="btn primary">Generate Wallets</button>
+      </div>
+      
+      <div class="card" id="importSection">
+        <h2>Import Wallets</h2>
+        <div class="form-group">
+          <label for="importFile">Import from JSON file:</label>
+          <input type="file" id="importFile" accept=".json">
+        </div>
+        <button id="importBtn" class="btn secondary">Import Wallets</button>
+      </div>
+      
+      <div class="card" id="walletsContainer" style="display: none;">
+        <h2>Generated Wallets <span id="walletCountDisplay"></span></h2>
+        <div class="actions">
+          <button id="downloadBtn" class="btn secondary">Download as JSON</button>
+          <button id="copyAllBtn" class="btn secondary">Copy All</button>
+          <button id="clearBtn" class="btn danger">Clear</button>
+          <button id="refreshAllBtn" class="btn secondary">Refresh All Balances</button>
+          <button id="useLikeBtn" class="btn primary">Use for Liking & Buying</button>
+        </div>
+        <div class="table-container">
+          <table id="walletsTable">
+            <thead>
+              <tr>
+                <th><input type="checkbox" id="selectAllWallets"></th>
+                <th>#</th>
+                <th>Public Key</th>
+                <th>Balance</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="walletsTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    
+    <div id="like-tab" class="tab-content">
+      <div class="card">
+        <h2>Batch Like Settings</h2>
+        <div class="form-group">
+          <label for="targetTokens">Target Tokens (comma separated):</label>
+          <textarea id="targetTokens" rows="3" placeholder="Enter target tokens separated by commas"></textarea>
+        </div>
+        
+        <div class="form-group">
+          <h3>Delay Settings</h3>
+          <div class="delay-settings">
+            <div>
+              <label for="walletMinDelay">Wallet Min Delay (ms):</label>
+              <input type="number" id="walletMinDelay" min="10" value="50">
+            </div>
+            <div>
+              <label for="walletMaxDelay">Wallet Max Delay (ms):</label>
+              <input type="number" id="walletMaxDelay" min="10" value="100">
+            </div>
+            <div>
+              <label for="likeDelay">Like Delay (ms):</label>
+              <input type="number" id="likeDelay" min="10" value="100">
+            </div>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>Selected Wallets: <span id="selectedWalletCount">0</span></label>
+          <div class="selected-wallets-container">
+            <ul id="selectedWalletsList"></ul>
+          </div>
+        </div>
+        
+        <button id="startLikeBtn" class="btn primary" disabled>Start Batch Liking</button>
+      </div>
+      
+      <div class="card" id="likeResultsContainer" style="display: none;">
+        <h2>Liking Results</h2>
+        <div id="likeResults">
+          <div class="progress-container">
+            <div id="likeProgress" class="progress-bar"></div>
+          </div>
+          <div id="likeStats">
+            <div>Success: <span id="likeSuccessCount">0</span></div>
+            <div>Failed: <span id="likeFailedCount">0</span></div>
+          </div>
+        </div>
+        <div id="likeLog"></div>
+      </div>
+    </div>
+    
+    <div id="projects-tab" class="tab-content">
+      <div class="card">
+        <h2>FlipN Projects</h2>
+        <p>Browse and select projects to add to your target list for batch liking or buying.</p>
+        <button id="loadProjectsBtn" class="btn primary">Load Projects</button>
+        <div id="projectsLoading" class="loading" style="display: none;">Loading projects...</div>
+      </div>
+      
+      <div id="projectsContainer" class="projects-container">
+        <div id="projectsList" class="projects-list"></div>
+      </div>
+    </div>
+    
+    <div id="buy-tab" class="tab-content">
+      <div class="card">
+        <h2>Batch Buy Settings</h2>
+        <div class="form-group">
+          <label for="buyTargetTokens">Target Tokens (comma separated):</label>
+          <textarea id="buyTargetTokens" rows="3" placeholder="Enter target tokens separated by commas"></textarea>
+        </div>
+        
+        <div class="form-group">
+          <h3>Purchase Settings</h3>
+          <div class="purchase-settings">
+            <div>
+              <label for="solAmount">SOL Amount Per Token:</label>
+              <input type="number" id="solAmount" min="0.001" step="0.001" value="0.01">
+            </div>
+            <div>
+              <label for="slippageTolerance">Slippage Tolerance (%):</label>
+              <input type="number" id="slippageTolerance" min="0.1" max="100" step="0.1" value="3">
+            </div>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <h3>Delay Settings</h3>
+          <div class="delay-settings">
+            <div>
+              <label for="buyWalletMinDelay">Wallet Min Delay (ms):</label>
+              <input type="number" id="buyWalletMinDelay" min="10" value="50">
+            </div>
+            <div>
+              <label for="buyWalletMaxDelay">Wallet Max Delay (ms):</label>
+              <input type="number" id="buyWalletMaxDelay" min="10" value="100">
+            </div>
+            <div>
+              <label for="buyDelay">Buy Delay (ms):</label>
+              <input type="number" id="buyDelay" min="10" value="100">
+            </div>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>Selected Wallets: <span id="buySelectedWalletCount">0</span></label>
+          <div class="selected-wallets-container">
+            <ul id="buySelectedWalletsList"></ul>
+          </div>
+        </div>
+        
+        <button id="startBuyBtn" class="btn primary" disabled>Start Batch Buying</button>
+      </div>
+      
+      <div class="card" id="buyResultsContainer" style="display: none;">
+        <h2>Buying Results</h2>
+        <div id="buyResults">
+          <div class="progress-container">
+            <div id="buyProgress" class="progress-bar"></div>
+          </div>
+          <div id="buyStats">
+            <div>Success: <span id="buySuccessCount">0</span></div>
+            <div>Failed: <span id="buyFailedCount">0</span></div>
+          </div>
+        </div>
+        <div id="buyLog"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/wallet.js"></script>
+  <script src="js/like.js"></script>
+  <script src="js/buy.js"></script>
+  <script src="js/projects.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

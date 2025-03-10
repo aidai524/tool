@@ -1,6 +1,7 @@
 {
   "version": 2,
   "builds": [
+    { "src": "server.js", "use": "@vercel/node" },
     { "src": "api/**/*.js", "use": "@vercel/node" },
     { "src": "public/**/*", "use": "@vercel/static" }
   ],
@@ -34,12 +35,12 @@
       ],
       "status": 401
     },
+    { "src": "/api/(.*)", "dest": "/server.js" },
     { "src": "/api/generate-wallets", "dest": "/api/generate-wallets.js" },
     { "src": "/api/validate-wallets", "dest": "/api/validate-wallets.js" },
     { "src": "/api/import-wallets", "dest": "/api/import-wallets.js" },
     { "src": "/api/like-projects", "dest": "/api/like-projects.js" },
     { "src": "/api/buy-tokens", "dest": "/api/buy-tokens.js" },
-    { "src": "/api/wallet-balance/(.*)", "dest": "/api/wallet-balance.js" },
     { "src": "/api/projects/list", "dest": "/api/projects/list.js" },
     { "src": "/api/projects", "dest": "/api/projects/index.js" },
     { "handle": "filesystem" },

@@ -452,7 +452,16 @@ class WalletManager {
     
     try {
       // Call API to get updated balance
-      const response = await fetch(`/api/wallet-balance/${wallet.publicKey}`);
+      // Determine if we're in production (Vercel) or local environment
+      const isProduction = window.location.hostname !== 'localhost' && !window.location.hostname.includes('127.0.0.1');
+      
+      // Use appropriate URL format based on environment
+      const apiUrl = isProduction
+        ? `${window.location.origin}/api/wallet-balance/${wallet.publicKey}`
+        : `/api/wallet-balance/${wallet.publicKey}`;
+      
+      console.log('Fetching wallet balance from:', apiUrl);
+      const response = await fetch(apiUrl);
       const data = await response.json();
       
       if (data.error) {

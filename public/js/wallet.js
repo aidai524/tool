@@ -12,6 +12,7 @@ class WalletManager {
     this.clearBtn = document.getElementById('clearBtn');
     this.refreshAllBtn = document.getElementById('refreshAllBtn');
     this.useLikeBtn = document.getElementById('useLikeBtn');
+    this.useBuyBtn = document.getElementById('useBuyBtn');
     this.walletsContainer = document.getElementById('walletsContainer');
     this.walletsTableBody = document.getElementById('walletsTableBody');
     this.walletCountInput = document.getElementById('walletCount');
@@ -56,6 +57,9 @@ class WalletManager {
     
     // Use for liking
     this.useLikeBtn.addEventListener('click', () => this.useForLiking());
+    
+    // Use for buying
+    this.useBuyBtn.addEventListener('click', () => this.useForBuying());
     
     // Select all wallets
     this.selectAllWallets.addEventListener('change', (e) => this.toggleSelectAll(e.target.checked));
@@ -266,7 +270,7 @@ class WalletManager {
    */
   useForLiking() {
     if (this.selectedWallets.size === 0) {
-      alert('Please select at least one wallet to use for liking and buying');
+      alert('Please select at least one wallet to use for liking');
       return;
     }
     
@@ -279,8 +283,23 @@ class WalletManager {
     if (window.likeManager) {
       window.likeManager.updateSelectedWallets(selectedWalletsList);
     }
+  }
+  
+  /**
+   * Use selected wallets for buying
+   */
+  useForBuying() {
+    if (this.selectedWallets.size === 0) {
+      alert('Please select at least one wallet to use for buying');
+      return;
+    }
     
-    // Update buy tab with selected wallets if buyManager exists
+    const selectedWalletsList = Array.from(this.selectedWallets).map(index => this.wallets[index]);
+    
+    // Switch to buy tab
+    document.querySelector('.tab-btn[data-tab="buy-tab"]').click();
+    
+    // Update buy tab with selected wallets
     if (window.buyManager) {
       window.buyManager.updateSelectedWallets(selectedWalletsList);
     }

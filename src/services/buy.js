@@ -53,6 +53,13 @@ class FlipN {
         .map(key => `${key}=${encodeURIComponent(params[key])}`)
         .join('&');
 
+      // Print curl command for debugging
+      const fullUrl = `${url}?${queryString}`;
+      console.log('\n=== CURL COMMAND FOR ESTIMATE API ===');
+      console.log(`curl -X GET "${fullUrl}" \
+  -H "accept: application/json"`); 
+      console.log('======================================\n');
+
       const response = await fetch(`${url}?${queryString}`, {
         method: 'GET',
         headers: {
@@ -61,6 +68,11 @@ class FlipN {
       });
 
       const data = await response.json();
+
+      // Print API response
+      console.log('=== ESTIMATE API RESPONSE ===');
+      console.log(JSON.stringify(data, null, 2));
+      console.log('==============================\n');
 
       if (data && data.quote) {
         return data.quote
@@ -102,6 +114,12 @@ class FlipN {
         .map(key => `${key}=${encodeURIComponent(params[key])}`)
         .join('&');
 
+      // Print curl command for debugging
+      const fullUrl = `${url}?${queryString}`;
+      console.log('\n=== CURL COMMAND FOR BUY API ===');
+      console.log(`curl -X GET "${fullUrl}" \
+  -H "accept: application/json"`); 
+      console.log('==================================\n');
 
       const response = await fetch(`${url}?${queryString}`, {
         method: 'get',
@@ -112,7 +130,10 @@ class FlipN {
 
       const responseData = await response.json();
 
-      console.log('responseData: ', responseData);
+      // Print API response in a more structured format
+      console.log('=== BUY API RESPONSE ===');
+      console.log(JSON.stringify(responseData, null, 2));
+      console.log('========================\n');
 
       if (responseData && responseData.txId) {
         const txBase64 = responseData.txId;
@@ -137,27 +158,71 @@ class FlipN {
       const txBuffer = Buffer.from(txBase64, 'base64');
       const transaction = Transaction.from(txBuffer);
 
-      // Get the latest blockhash
-      const latestBlockhash = await this.connection.getLatestBlockhash();
+      // Get the latest blockhash with longer validity
+      const latestBlockhash = await this.connection.getLatestBlockhash('finalized');
       console.log('latestBlockhash: ', latestBlockhash);
 
       // Update transaction with latest blockhash and fee payer
       transaction.recentBlockhash = latestBlockhash.blockhash;
       transaction.feePayer = this.owner.publicKey;
+      
+      // Add a compute budget instruction to increase priority fee
+      const priorityFeeInstruction = ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: 10000, // Adjust this value based on network conditions
+      });
+      transaction.instructions.unshift(priorityFeeInstruction);
 
-      console.log('transaction: ', this.owner.publicKey.toBase58());
+      console.log('transaction wallet: ', this.owner.publicKey.toBase58());
 
-      // Send and confirm transaction
-      const signature = await sendAndConfirmTransaction(
-        this.connection,
-        transaction,
-        [this.owner],
-        {
-          skipPreflight: true
+      // Implement retry mechanism with exponential backoff
+      const MAX_RETRIES = 3;
+      let retryCount = 0;
+      let lastError = null;
+
+      while (retryCount < MAX_RETRIES) {
+        try {
+          // Send and confirm transaction with increased timeout
+          const signature = await sendAndConfirmTransaction(
+            this.connection,
+            transaction,
+            [this.owner],
+            {
+              skipPreflight: true,
+              commitment: 'confirmed',
+              maxRetries: 5,
+              confirmTransactionInitialTimeout: 60000 // 60 seconds
+            }
+          );
+
+          console.log('Transaction signature: ', signature);
+          return signature; // Success - exit retry loop
+        } catch (error) {
+          lastError = error;
+          console.warn(`Transaction attempt ${retryCount + 1} failed: ${error.message}`);
+          
+          // If this is a blockhash expired error, get a new blockhash and retry
+          if (error.message.includes('block height exceeded') || 
+              error.message.includes('blockhash expired')) {
+            
+            // Get a fresh blockhash
+            const newBlockhash = await this.connection.getLatestBlockhash('finalized');
+            transaction.recentBlockhash = newBlockhash.blockhash;
+            console.log(`Retrying with new blockhash: ${newBlockhash.blockhash}`);
+            
+            // Exponential backoff
+            const backoffTime = Math.pow(2, retryCount) * 1000;
+            console.log(`Waiting ${backoffTime}ms before retry...`);
+            await new Promise(resolve => setTimeout(resolve, backoffTime));
+            retryCount++;
+          } else {
+            // For other errors, don't retry
+            throw error;
+          }
         }
-      );
+      }
 
-      console.log('Transaction signature: ', signature);
+      // If we've exhausted all retries, throw the last error
+      throw lastError || new Error('Transaction failed after maximum retries');
 
       return {
         signature,
@@ -241,17 +306,44 @@ async function batchBuy(wallets, targetTokens, solAmount, slippageTolerance, del
         const txBase64 = await flipN.buyToken(quote, solAmount);
 
         // Sign and send transaction
-        const { signature } = await flipN.signAndSendTransaction(txBase64);
+        const signature = await flipN.signAndSendTransaction(txBase64);
 
         // Record success
         results.success++;
-        results.details.push(`Wallet ${wallet.publicKey.substring(0, 10)}... bought ${tokenAddress.substring(0, 10)}... (Signature: ${signature.substring(0, 10)}...)`);
+        
+        // Format the signature for display - handle both string and object formats
+        const signatureStr = typeof signature === 'string' ? signature : 
+                            (signature && signature.signature ? signature.signature : 'unknown');
+        const shortSig = signatureStr.substring(0, 10);
+        
+        // Safely get shortened wallet address
+        const walletStr = wallet && wallet.publicKey ? 
+                         (typeof wallet.publicKey === 'string' ? wallet.publicKey : 
+                          (wallet.publicKey.toString ? wallet.publicKey.toString() : 'unknown')) : 'unknown';
+        const shortWallet = walletStr.substring(0, 10);
+        
+        // Safely get shortened token address
+        const tokenStr = typeof tokenAddress === 'string' ? tokenAddress : 'unknown';
+        const shortToken = tokenStr.substring(0, 10);
+        
+        results.details.push(`Wallet ${shortWallet}... bought ${shortToken}... (Signature: ${shortSig}...)`);
 
-        console.log(`Success: Wallet ${wallet.publicKey.substring(0, 10)}... bought ${tokenAddress.substring(0, 10)}...`);
+        console.log(`Success: Wallet ${shortWallet}... bought ${shortToken}... (Signature: ${shortSig}...)`);
       } catch (error) {
         // Record failure
         results.failed++;
-        const errorMessage = `Error with wallet ${wallet.publicKey.substring(0, 10)}... buying ${tokenAddress.substring(0, 10)}...: ${error.message}`;
+        
+        // Safely get shortened wallet address
+        const walletStr = wallet && wallet.publicKey ? 
+                         (typeof wallet.publicKey === 'string' ? wallet.publicKey : 
+                          (wallet.publicKey.toString ? wallet.publicKey.toString() : 'unknown')) : 'unknown';
+        const shortWallet = walletStr.substring(0, 10);
+        
+        // Safely get shortened token address
+        const tokenStr = typeof tokenAddress === 'string' ? tokenAddress : 'unknown';
+        const shortToken = tokenStr.substring(0, 10);
+        
+        const errorMessage = `Error with wallet ${shortWallet}... buying ${shortToken}...: ${error.message}`;
         results.errors.push(errorMessage);
 
         console.error(errorMessage);

@@ -24,7 +24,11 @@ const PORT = process.env.PORT || 3001;
 // setGlobalDispatcher(httpDispatcher);
 
 // Initialize Solana connection (devnet for balance checking)
-const solanaConnection = new Connection(process.env.RPC, {
+// Ensure RPC URL starts with http:// or https://
+const rpcUrl = process.env.RPC || 'https://api.devnet.solana.com';
+const formattedRpcUrl = rpcUrl.startsWith('http') ? rpcUrl : `https://${rpcUrl}`;
+
+const solanaConnection = new Connection(formattedRpcUrl, {
   fetch: fetch
 });
 

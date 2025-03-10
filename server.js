@@ -7,6 +7,7 @@ const bs58 = require('bs58').default || require('bs58');
 const fs = require('fs');
 const path = require('path');
 const dotenv = require('dotenv');
+const { setGlobalDispatcher, ProxyAgent } = require('undici');
 const axios = require('axios');
 const { createKeypairFromPrivateKey, createKeypairFromBase64PrivateKey } = require('./src/services/auth');
 const likeService = require('./src/services/like');
@@ -19,8 +20,13 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// const httpDispatcher = new ProxyAgent({ uri: "http://127.0.0.1:4780" });
+// setGlobalDispatcher(httpDispatcher);
+
 // Initialize Solana connection (devnet for balance checking)
-const solanaConnection = new Connection('https://api.devnet.solana.com', 'confirmed');
+const solanaConnection = new Connection(process.env.RPC, {
+  fetch: fetch
+});
 
 // Middleware
 app.use(cors());
@@ -177,9 +183,11 @@ app.post('/api/buy-tokens', async (req, res) => {
     if (typeof slippageTolerance !== 'number' || slippageTolerance <= 0 || slippageTolerance > 100) {
       return res.status(400).json({ error: 'Invalid slippage tolerance' });
     }
+
+    console.log('wallets: ', wallets);
     
     // Start batch buying process
-    const results = await buyService.batchBuy(wallets, targetTokens, solAmount, slippageTolerance, delays);
+    const results = await buyService.batchBuy(wallets, targetTokens, Number(solAmount) * (10 ** 9), slippageTolerance, delays);
     
     res.json({
       success: true,

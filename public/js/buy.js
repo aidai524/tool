@@ -175,6 +175,8 @@ class BuyManager {
     this.addLogEntry(`Target tokens: ${targetTokens.join(', ')}`, 'info');
     this.addLogEntry(`SOL amount per token: ${solAmount}`, 'info');
     this.addLogEntry(`Slippage tolerance: ${slippageTolerance}%`, 'info');
+
+    
     
     try {
       // Start batch buying

@@ -1,25 +1,33 @@
-const { Connection, Transaction, Keypair, sendAndConfirmTransaction } = require('@solana/web3.js');
+const { Connection, Transaction, Keypair, sendAndConfirmTransaction, ComputeBudgetProgram } = require('@solana/web3.js');
 const { createKeypairFromPrivateKey } = require('./auth');
 const axios = require('axios');
+const bs58 = require('bs58').default || require('bs58');
 const fs = require('fs').promises;
 const path = require('path');
 const dotenv = require('dotenv');
+const { setGlobalDispatcher, ProxyAgent } = require('undici');
 
 // Load environment variables
 dotenv.config();
+
+// const httpDispatcher = new ProxyAgent({ uri: "http://127.0.0.1:4780" });
+// setGlobalDispatcher(httpDispatcher);
+
 
 // FlipN class implementation for Node.js
 class FlipN {
   constructor() {
     this.rpc = process.env.RPC || 'https://api.mainnet-beta.solana.com';
     this.programId = process.env.PROGRAM_ID;
-    this.connection = new Connection(this.rpc, 'confirmed');
+    this.connection = new Connection(this.rpc, {
+      fetch: fetch
+    });
   }
 
   async init(params) {
-    this.owner = createKeypairFromPrivateKey(params.privateKey);
+    this.owner = Keypair.fromSecretKey(bs58.decode(params.privateKey));
     this.tokenAddress = params.tokenAddress;
-    
+
     // Additional initialization if needed
     return this;
   }
@@ -29,10 +37,10 @@ class FlipN {
       // Call the FlipN API to get the estimate
       const apiBaseUrl = process.env.API_BASE_URL || 'https://api.dumpdump.fun/api/v1';
       const url = `${apiBaseUrl}/estimate`;
-      
+
       // Ensure addresses are properly formatted
-      const ownerAddress = this.owner.publicKey.toString();
-      
+      const ownerAddress = this.owner.publicKey.toBase58();
+
       const params = {
         inNumber: inNumber,
         inType: inType,
@@ -40,36 +48,25 @@ class FlipN {
         tokenAddress: this.tokenAddress,
         type: 1
       };
-      
-      // Log the equivalent curl command for debugging
+
       const queryString = Object.keys(params)
-        .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
+        .map(key => `${key}=${encodeURIComponent(params[key])}`)
         .join('&');
-      const curlCommand = `curl -X 'GET' '${url}?${queryString}' -H 'accept: application/json'`;
-      console.log('\n[DEBUG] Estimate API curl equivalent:');
-      console.log(curlCommand);
-      console.log(`\n[DEBUG] Token address: ${this.tokenAddress}`);
-      console.log(`[DEBUG] Owner address: ${ownerAddress}`);
-      
-      const response = await axios({
-        method: 'get',
-        url: url,
-        params: params,
+
+      const response = await fetch(`${url}?${queryString}`, {
+        method: 'GET',
         headers: {
-          'accept': 'application/json',
-          'Origin': 'https://test.flipn.fun',
-          'Referer': 'https://test.flipn.fun/'
+          'accept': 'application/json'
         }
       });
-      
-      // Log the response
-      console.log(`\n[DEBUG] Estimate API response status: ${response.status}`);
-      console.log(`[DEBUG] Estimate API response data:`, JSON.stringify(response.data, null, 2));
-      
-      if (response.data && response.data.code === 0) {
-        return response.data.data.estimatedAmount;
+
+      const data = await response.json();
+
+      if (data && data.quote) {
+        return data.quote
       }
-      
+
+
       throw new Error(`Failed to get estimate from API: ${JSON.stringify(response.data)}`);
     } catch (error) {
       console.error('\n[ERROR] Error estimating token amount:', error);
@@ -81,57 +78,48 @@ class FlipN {
     }
   }
 
-  async buyToken(tokenAmount, maxSolAmount) {
+  async buyToken(quote, maxSolAmount) {
     try {
       // Call the FlipN API to create a buy transaction
       const apiBaseUrl = process.env.API_BASE_URL || 'https://api.dumpdump.fun/api/v1';
       const url = `${apiBaseUrl}/buy`;
-      
+
       // Ensure addresses are properly formatted
-      const ownerAddress = this.owner.publicKey.toString();
-      
-      const data = {
+      const ownerAddress = this.owner.publicKey.toBase58();
+
+      console.log('quote: ', quote, ownerAddress);
+
+      const params = {
         inNumber: maxSolAmount,
         inType: 'sol',
         owner: ownerAddress,
+        params: JSON.stringify(quote),
         tokenAddress: this.tokenAddress,
         type: 1
       };
-      
-      // Log the equivalent curl command for debugging
-      const curlCommand = `curl -X 'POST' '${url}' \
--H 'accept: application/json' \
--H 'Content-Type: application/json' \
--H 'Origin: https://test.flipn.fun' \
--H 'Referer: https://test.flipn.fun/' \
--d '${JSON.stringify(data)}'`;
-      console.log('\n[DEBUG] Buy API curl equivalent:');
-      console.log(curlCommand);
-      console.log(`\n[DEBUG] Token address: ${this.tokenAddress}`);
-      console.log(`[DEBUG] Owner address: ${ownerAddress}`);
-      
-      const response = await axios({
-        method: 'post',
-        url: url,
-        data: data,
+
+      const queryString = Object.keys(params)
+        .map(key => `${key}=${encodeURIComponent(params[key])}`)
+        .join('&');
+
+
+      const response = await fetch(`${url}?${queryString}`, {
+        method: 'get',
         headers: {
-          'accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Origin': 'https://test.flipn.fun',
-          'Referer': 'https://test.flipn.fun/'
+          'accept': 'application/json'
         }
-      });
-      
-      // Log the response
-      console.log(`\n[DEBUG] Buy API response status: ${response.status}`);
-      console.log(`[DEBUG] Buy API response data:`, JSON.stringify(response.data, null, 2));
-      
-      if (response.data && response.data.code === 0) {
-        const txBase64 = response.data.data.transaction;
+      })
+
+      const responseData = await response.json();
+
+      console.log('responseData: ', responseData);
+
+      if (responseData && responseData.txId) {
+        const txBase64 = responseData.txId;
         // Return the transaction for signing
         return txBase64;
       }
-      
+
       throw new Error(`Failed to create buy transaction: ${JSON.stringify(response.data)}`);
     } catch (error) {
       console.error('\n[ERROR] Error creating buy transaction:', error);
@@ -148,15 +136,17 @@ class FlipN {
       // Decode the transaction
       const txBuffer = Buffer.from(txBase64, 'base64');
       const transaction = Transaction.from(txBuffer);
-      
+
       // Get the latest blockhash
       const latestBlockhash = await this.connection.getLatestBlockhash();
       console.log('latestBlockhash: ', latestBlockhash);
-      
+
       // Update transaction with latest blockhash and fee payer
       transaction.recentBlockhash = latestBlockhash.blockhash;
       transaction.feePayer = this.owner.publicKey;
-      
+
+      console.log('transaction: ', this.owner.publicKey.toBase58());
+
       // Send and confirm transaction
       const signature = await sendAndConfirmTransaction(
         this.connection,
@@ -166,9 +156,9 @@ class FlipN {
           skipPreflight: true
         }
       );
-      
+
       console.log('Transaction signature: ', signature);
-      
+
       return {
         signature,
         confirmation: true
@@ -211,11 +201,11 @@ async function batchBuy(wallets, targetTokens, solAmount, slippageTolerance, del
     errors: [],
     details: []
   };
-  
+
   // Process each wallet
   for (let i = 0; i < wallets.length; i++) {
     const wallet = wallets[i];
-    
+
     // Random delay between wallets
     if (i > 0 && delays && delays.wallet) {
       const walletDelay = Math.floor(
@@ -223,16 +213,16 @@ async function batchBuy(wallets, targetTokens, solAmount, slippageTolerance, del
       );
       await new Promise(resolve => setTimeout(resolve, walletDelay));
     }
-    
+
     // Process each token for this wallet
     for (let j = 0; j < targetTokens.length; j++) {
       const tokenAddress = targetTokens[j];
-      
+
       // Delay between buys
       if (j > 0 && delays && delays.buy) {
         await new Promise(resolve => setTimeout(resolve, delays.buy.fixed));
       }
-      
+
       try {
         // Initialize FlipN with wallet
         const flipN = new FlipN();
@@ -240,35 +230,35 @@ async function batchBuy(wallets, targetTokens, solAmount, slippageTolerance, del
           privateKey: wallet.privateKey,
           tokenAddress: tokenAddress
         });
-        
+
         // Estimate token amount
-        const tokenAmount = await flipN.estimate(solAmount, 'sol');
-        
+        const quote = await flipN.estimate(solAmount, 'sol');
+
         // Apply slippage tolerance (3% as in reference code)
-        const adjustedTokenAmount = tokenAmount * (1 - 0.03);
-        
+        // const adjustedTokenAmount = tokenAmount * (1 - 0.03);
+
         // Create buy transaction
-        const txBase64 = await flipN.buyToken(adjustedTokenAmount, solAmount);
-        
+        const txBase64 = await flipN.buyToken(quote, solAmount);
+
         // Sign and send transaction
         const { signature } = await flipN.signAndSendTransaction(txBase64);
-        
+
         // Record success
         results.success++;
         results.details.push(`Wallet ${wallet.publicKey.substring(0, 10)}... bought ${tokenAddress.substring(0, 10)}... (Signature: ${signature.substring(0, 10)}...)`);
-        
+
         console.log(`Success: Wallet ${wallet.publicKey.substring(0, 10)}... bought ${tokenAddress.substring(0, 10)}...`);
       } catch (error) {
         // Record failure
         results.failed++;
         const errorMessage = `Error with wallet ${wallet.publicKey.substring(0, 10)}... buying ${tokenAddress.substring(0, 10)}...: ${error.message}`;
         results.errors.push(errorMessage);
-        
+
         console.error(errorMessage);
       }
     }
   }
-  
+
   return results;
 }
 

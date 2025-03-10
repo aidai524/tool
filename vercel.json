@@ -5,6 +5,35 @@
     { "src": "public/**/*", "use": "@vercel/static" }
   ],
   "routes": [
+    {
+      "src": "/(.*)",
+      "headers": {
+        "WWW-Authenticate": "Basic realm='Solana Wallet & Like Tool'"
+      },
+      "continue": true
+    },
+    {
+      "src": "/(.*)",
+      "has": [
+        {
+          "type": "header",
+          "key": "Authorization",
+          "value": "Basic YWRtaW46dG9kYW1vb24="
+        }
+      ],
+      "continue": true
+    },
+    {
+      "src": "/(.*)",
+      "missing": [
+        {
+          "type": "header",
+          "key": "Authorization",
+          "value": "Basic YWRtaW46dG9kYW1vb24="
+        }
+      ],
+      "status": 401
+    },
     { "src": "/api/generate-wallets", "dest": "/api/generate-wallets.js" },
     { "src": "/api/validate-wallets", "dest": "/api/validate-wallets.js" },
     { "src": "/api/import-wallets", "dest": "/api/import-wallets.js" },

@@ -118,19 +118,19 @@ class LikeService {
   /**
    * Like a specific project
    * @param {Object} keypair - Solana keypair
-   * @param {string} projectId - ID of the project to like
+   * @param {string} project_id - ID of the project to like
    * @returns {Promise<Object>} - Response from the like request
    */
-  async likeProject(keypair, projectId) {
+  async likeProject(keypair, project_id) {
     try {
       console.log('\n=== Liking Project ===');
-      console.log('Project ID:', projectId);
+      console.log('Project ID:', project_id);
       
       // Ensure we have a valid auth token
       const token = await generateSignatureAndGetToken(keypair);
       
-      // 根据成功的curl命令，将id作为URL查询参数而不是请求体
-      const url = `${API_BASE_URL}/project/like?id=${encodeURIComponent(projectId)}`;
+      // 保持原有 API 端点路径，使用 id 作为查询参数名，但传入的值是 project_id
+      const url = `${API_BASE_URL}/project/like?id=${encodeURIComponent(project_id)}`;
       
       // 使用空的请求体
       const body = '';
@@ -255,7 +255,7 @@ class LikeService {
           try {
             console.log(`\n=== Liking Token: ${targetToken} with Wallet: ${wallet.publicKey} ===`);
             
-            // 直接调用点赞接口，使用token ID作为项目ID
+            // 直接调用点赞接口，使用token ID作为项目ID，现在参数名是 project_id
             const likeResult = await this.likeProject(keypair, targetToken);
             
             results.details.push({

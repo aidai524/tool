@@ -316,7 +316,7 @@ class ProjectManager {
         
         <div class="project-footer">
           <span class="project-date">Created: ${formattedDate}</span>
-          <span class="project-id">ID: ${project.id}</span>
+          <span class="project-id">ID: ${project.project_id}</span>
         </div>
         
         <div class="project-token-address">
@@ -328,10 +328,10 @@ class ProjectManager {
         </div>
         
         <div class="project-actions">
-          <button class="add-to-targets-btn" data-id="${project.id}" data-symbol="${project.token_symbol || ''}">
+          <button class="add-to-targets-btn" data-id="${project.project_id}" data-symbol="${project.token_symbol || ''}">
             Add to Like
           </button>
-          <button class="add-to-buy-targets-btn" data-id="${project.id}" data-address="${project.address || ''}" data-symbol="${project.token_symbol || ''}">
+          <button class="add-to-buy-targets-btn" data-id="${project.project_id}" data-address="${project.address || ''}" data-symbol="${project.token_symbol || ''}">
             Add to Buy
           </button>
         </div>

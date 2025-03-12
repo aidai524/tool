@@ -46,7 +46,8 @@ class FlipN {
         inType: inType,
         owner: ownerAddress,
         tokenAddress: this.tokenAddress,
-        type: 1
+        type: 1,
+        isMainnet: true
       };
 
       const queryString = Object.keys(params)
@@ -107,7 +108,8 @@ class FlipN {
         owner: ownerAddress,
         params: JSON.stringify(quote),
         tokenAddress: this.tokenAddress,
-        type: 1
+        type: 1,
+        isMainnet: true
       };
 
       const queryString = Object.keys(params)

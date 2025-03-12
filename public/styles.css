@@ -472,11 +472,11 @@ tr:hover {
   background-color: #f9f9f9;
 }
 
-#selectedWalletsList {
+#selectedWalletsList, #buySelectedWalletsList {
   list-style-type: none;
 }
 
-#selectedWalletsList li {
+#selectedWalletsList li, #buySelectedWalletsList li {
   padding: 5px 0;
   border-bottom: 1px solid #eee;
   display: flex;
@@ -484,7 +484,7 @@ tr:hover {
   align-items: center;
 }
 
-#selectedWalletsList li:last-child {
+#selectedWalletsList li:last-child, #buySelectedWalletsList li:last-child {
   border-bottom: none;
 }
 

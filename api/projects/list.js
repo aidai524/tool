@@ -50,20 +50,19 @@ module.exports = async (req, res) => {
     const apiReferer = process.env.API_REFERER || 'https://test.flipn.fun/';
     
     // Make request to FlipN API
-    console.log('Requesting project list from:', `${apiBaseUrl}/project/list`);
+    console.log('Requesting project list from:', `${apiBaseUrl}/project/trends/list`);
     
     try {
       const response = await axios({
         method: 'get',
-        url: `${apiBaseUrl}/project/list`,
+        url: `${apiBaseUrl}/project/trends/list`,
         headers: {
           'Authorization': authToken,
           'Origin': apiOrigin,
           'Referer': apiReferer
         },
         params: {
-          launchType: 1,
-          limit: 30,
+          limit: 100,
           page: page
         }
       });
@@ -92,18 +91,17 @@ module.exports = async (req, res) => {
       
       // Try alternative endpoint if first one fails
       try {
-        console.log('Trying alternative endpoint:', `${apiBaseUrl}/project/list`);
+        console.log('Trying alternative endpoint:', `${apiBaseUrl}/project/trends/list`);
         const altResponse = await axios({
           method: 'get',
-          url: `${apiBaseUrl}/project/list`,
+          url: `${apiBaseUrl}/project/trends/list`,
           headers: {
             'Authorization': authToken,
             'Origin': apiOrigin,
             'Referer': apiReferer
           },
           params: {
-            launchType: 1,
-            limit: 30,
+            limit: 100,
             page: page
           }
         });

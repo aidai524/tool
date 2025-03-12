@@ -157,14 +157,62 @@ class WalletManager {
     const file = this.importFile.files[0];
     const reader = new FileReader();
     
+    // Show loading indicator
+    const importStatus = document.createElement('div');
+    importStatus.id = 'importStatus';
+    importStatus.style.marginTop = '10px';
+    importStatus.style.padding = '10px';
+    importStatus.style.backgroundColor = '#f8f9fa';
+    importStatus.style.borderRadius = '4px';
+    importStatus.innerHTML = '<p>Importing wallets... Please wait.</p>';
+    
+    const importStatusContainer = document.querySelector('#importSection');
+    if (importStatusContainer) {
+      importStatusContainer.appendChild(importStatus);
+    }
+    
     reader.onload = async (event) => {
       try {
-        const importedData = JSON.parse(event.target.result);
+        console.log('File loaded, parsing JSON...');
+        let importedData;
         
-        if (!importedData.wallets || !Array.isArray(importedData.wallets)) {
-          throw new Error('Invalid wallet data format');
+        try {
+          importedData = JSON.parse(event.target.result);
+        } catch (parseError) {
+          console.error('JSON parse error:', parseError);
+          throw new Error(`Invalid JSON format: ${parseError.message}`);
         }
         
+        // Log the structure of the imported data (without exposing private keys)
+        console.log('Imported data structure:', JSON.stringify({
+          hasWallets: !!importedData.wallets,
+          isWalletsArray: Array.isArray(importedData.wallets),
+          walletsCount: importedData.wallets ? importedData.wallets.length : 0
+        }));
+        
+        // Check if the data has the expected format
+        if (!importedData.wallets || !Array.isArray(importedData.wallets)) {
+          throw new Error('Invalid wallet data format: The file must contain a "wallets" array');
+        }
+        
+        if (importedData.wallets.length === 0) {
+          throw new Error('The wallet file contains an empty wallets array');
+        }
+        
+        // Validate that wallets have the required fields
+        const sampleWallet = importedData.wallets[0];
+        if (!sampleWallet.publicKey || !sampleWallet.privateKey) {
+          console.error('Invalid wallet format:', JSON.stringify({
+            hasPublicKey: !!sampleWallet.publicKey,
+            hasPrivateKey: !!sampleWallet.privateKey
+          }));
+          throw new Error('Invalid wallet format: Each wallet must have publicKey and privateKey fields');
+        }
+        
+        // Update status
+        importStatus.innerHTML = `<p>Validating ${importedData.wallets.length} wallets...</p>`;
+        
+        console.log(`Sending ${importedData.wallets.length} wallets to server for validation...`);
         const response = await fetch('/api/import-wallets', {
           method: 'POST',
           headers: {
@@ -173,14 +221,40 @@ class WalletManager {
           body: JSON.stringify({ wallets: importedData.wallets })
         });
         
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Server response error:', response.status, errorText);
+          throw new Error(`Server error (${response.status}): ${errorText}`);
+        }
+        
         const data = await response.json();
+        console.log('Server response:', JSON.stringify({
+          success: data.success,
+          imported: data.imported,
+          invalid: data.invalid
+        }));
         
         if (data.error) {
           throw new Error(data.error);
         }
         
+        // Check if we have any valid wallets
+        if (!data.wallets || !Array.isArray(data.wallets) || data.wallets.length === 0) {
+          throw new Error('No valid wallets found in the imported file');
+        }
+        
         // Append imported wallets to existing ones
-        this.wallets = [...this.wallets, ...data.wallets];
+        const newWallets = data.wallets.filter(importedWallet => {
+          // Avoid duplicates by checking if the public key already exists
+          return !this.wallets.some(existingWallet => 
+            existingWallet.publicKey === importedWallet.publicKey
+          );
+        });
+        
+        console.log(`Adding ${newWallets.length} new wallets (excluding ${data.wallets.length - newWallets.length} duplicates)`);
+        
+        // Add new wallets to the existing collection
+        this.wallets = [...this.wallets, ...newWallets];
         this.displayWallets();
         
         // Save to local storage
@@ -189,13 +263,47 @@ class WalletManager {
         this.walletsContainer.style.display = 'block';
         this.walletCountDisplay.textContent = `(${this.wallets.length})`;
         
-        alert(`Successfully imported ${data.imported} wallets`);
+        // Show success message with details
+        let successMessage = `Successfully imported ${newWallets.length} wallets`;
+        if (data.invalid > 0) {
+          successMessage += ` (${data.invalid} invalid wallets were skipped)`;
+        }
+        if (data.wallets.length - newWallets.length > 0) {
+          successMessage += ` (${data.wallets.length - newWallets.length} duplicate wallets were skipped)`;
+        }
+        
+        // Remove the status indicator
+        if (importStatus.parentNode) {
+          importStatus.parentNode.removeChild(importStatus);
+        }
+        
+        alert(successMessage);
       } catch (error) {
-        alert(`Error importing wallets: ${error.message}`);
+        console.error('Import error:', error);
+        
+        // Update status to show error
+        if (importStatus.parentNode) {
+          importStatus.style.backgroundColor = '#f8d7da';
+          importStatus.style.color = '#721c24';
+          importStatus.innerHTML = `<p>Error: ${error.message}</p>`;
+          
+          // Remove the error message after 10 seconds
+          setTimeout(() => {
+            if (importStatus.parentNode) {
+              importStatus.parentNode.removeChild(importStatus);
+            }
+          }, 10000);
+        } else {
+          alert(`Error importing wallets: ${error.message}`);
+        }
       }
     };
     
     reader.onerror = () => {
+      console.error('FileReader error');
+      if (importStatus.parentNode) {
+        importStatus.parentNode.removeChild(importStatus);
+      }
       alert('Error reading file');
     };
     
